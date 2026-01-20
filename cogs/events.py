@@ -30,7 +30,7 @@ class Events(commands.Cog):
                 color=discord.Color.gold()
             )
             # You can change this GIF to whatever you want
-            embed.set_image(url="https://media.tenor.com/bngfxunO5IAAAAAC/avatar-the-last-airbender-wan-shi-tong.gif")
+            embed.set_image(url="https://media1.tenor.com/m/NsZIP9zLBvcAAAAC/spirit.gif"")
             
             if member.avatar:
                 embed.set_thumbnail(url=member.avatar.url)
