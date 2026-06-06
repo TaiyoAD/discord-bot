@@ -30,7 +30,7 @@ class Events(commands.Cog):
                 color=discord.Color.gold()
             )
             # You can change this GIF to whatever you want
-            embed.set_image(url="https://media1.tenor.com/m/NsZIP9zLBvcAAAAC/spirit.gif"")
+            embed.set_image(url="https://media.discordapp.net/attachments/1512874290855415828/1512874608209035284/welcome.gif?ex=6a25adc6&is=6a245c46&hm=c2807f3890e8b13e42c022a76d97580c3d58a92ac383e84a69db5d8b9c32f2de&=&width=960&height=531")
             
             if member.avatar:
                 embed.set_thumbnail(url=member.avatar.url)

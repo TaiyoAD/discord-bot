@@ -48,7 +48,7 @@ class WanShiTongBot(commands.Bot):
     async def setup_hook(self):
         # List of Cogs to load
         # Ensure these files exist in your "cogs" folder!
-        cogs_list = ['cogs.ship', 'cogs.games', 'cogs.admin', 'cogs.events', 'cogs.moderation']
+        cogs_list = ['cogs.ship', 'cogs.games', 'cogs.admin', 'cogs.events', 'cogs.moderation','cogs.chat']
         
         for cog in cogs_list:
             try:
