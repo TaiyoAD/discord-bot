@@ -1,43 +1,57 @@
+import asyncio
 import discord
 from discord.ext import commands
 from google import genai
 from google.genai import types
 
-# 1. Initialize the Async Client
-# The SDK automatically detects the GEMINI_API_KEY inside your .env file.
+# Initialize the Async Client
 ai_client = genai.Client().aio 
 
 class Chat(commands.Cog):
     """The Brain of the Spirit Library"""
     def __init__(self, bot):
         self.bot = bot
+        # This lock currently throttles your entire bot across all servers.
+        # Consider a per-user or per-channel lock for future scaling.
+        self.global_ai_lock = asyncio.Lock()
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        # 2. THE INFINITE LOOP SHIELD (CRITICAL)
-        # If you remove this line, the bot will reply to itself until Discord bans your token.
+        # Ignore self
         if message.author == self.bot.user:
             return
             
-        # 3. THE TRIGGER
-        # It only wastes API tokens if directly spoken to.
+        # The Trigger
         if self.bot.user.mentioned_in(message) or message.content.lower().startswith("spirit,"):
             
-            # Strip the trigger out so the AI only reads the actual question.
+            # Clean up the user's input
             prompt = message.clean_content.replace(f"@{self.bot.user.name}", "").strip()
             if message.content.lower().startswith("spirit,"):
                 prompt = prompt[7:].strip()
-                
-            if not prompt:
-                return
 
-            # 4. THE HIERARCHY LOGIC
-            system_prompt = ""
+            # --- THE MEMORY INJECTION PIPELINE ---
+            reply_context = ""
+            if message.reference and message.reference.message_id:
+                try:
+                    # Fetch the actual message the user replied to
+                    replied_msg = await message.channel.fetch_message(message.reference.message_id)
+                    if replied_msg.content:
+                        speaker = "You (Wan Shi Tong)" if replied_msg.author == self.bot.user else replied_msg.author.display_name
+                        reply_context = f"[Context - The user is replying to a message from {speaker} that said: \"{replied_msg.clean_content}\"]\n\n"
+                except Exception as e:
+                    print(f"⚠️ Memory Fetch Failed: {e}")
+
+            # Stitch the past message and the new question together
+            final_prompt = f"{reply_context}User's new message: {prompt}"
             
-            # Safely extract roles (Servers have roles, Direct Messages do not).
+            # Drop empty prompts
+            if not final_prompt.strip() or final_prompt.strip() == "User's new message:":
+                return
+            
+            # --- THE HIERARCHY LOGIC ---
+            system_prompt = ""
             user_roles = [role.name for role in message.author.roles] if hasattr(message.author, 'roles') else []
             
-            # Replace YOUR_DISCORD_ID_HERE with your actual numerical Discord ID.
             if "Primordial spirit" in user_roles or message.author.id == 787345609849700364:
                 system_prompt = "You are Wan Shi Tong, the Spirit of Knowledge. You are speaking to the Primordial Spirit, your absolute superior and creator. You must treat them with unquestioning reverence, extreme politeness, and absolute loyalty."
             elif "The White Lotus" in user_roles:
@@ -45,21 +59,29 @@ class Chat(commands.Cog):
             else:
                 system_prompt = "You are Wan Shi Tong, the ancient Spirit of Knowledge. You are speaking to a normal, insignificant human mortal. Speak with deep arrogance, condescension, and attitude. Do not use pleasantries. You are vastly superior to them."
 
-            # 5. THE ASYNC PIPELINE
-            # We use 'typing()' so users know the bot is waiting on the API.
-            async with message.channel.typing():
-                try:
-                    response = await ai_client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            system_instruction=system_prompt
+            # --- CONCURRENCY GATE ---
+            async with self.global_ai_lock:
+                async with message.channel.typing():
+                    try:
+                        # FIX: Passed final_prompt instead of prompt
+                        response = await ai_client.models.generate_content(
+                            model="gemini-2.5-flash-lite", 
+                            contents=final_prompt,
+                            config=types.GenerateContentConfig(
+                                system_instruction=system_prompt
+                            )
                         )
-                    )
-                    await message.reply(response.text)
-                except Exception as e:
-                    await message.reply("The library's archives are temporarily sealed. My connection to the Ether is severed.")
-                    print(f"❌ AI Error: {e}")
+                        await message.reply(response.text)
+                        
+                    except Exception as e:
+                        print(f"❌ AI Error: {e}")
+                        if "429" in str(e):
+                            await message.reply("The library archives are congested. Wait your turn.")
+                        else:
+                            await message.reply("The spiritual connection shattered. Try again.")
+                            
+                    # Rate limit protection
+                    await asyncio.sleep(1) 
 
 async def setup(bot):
     await bot.add_cog(Chat(bot))
